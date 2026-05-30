@@ -1,0 +1,11 @@
+{
+  "ClientId": "YOUR_CLIENT_ID",
+  "ClientSecret": "YOUR_CLIENT_SECRET",
+  "WatchFolders": [
+    "C:\\Users\\YourName\\Downloads",
+    "C:\\Users\\YourName\\Documents\\Scans"
+  ],
+  "BackupFolder": "C:\\PdfWatcher\\Backups",
+  "MaxConcurrentJobs": 2,
+  "MaxSearchDepth": 5
+}

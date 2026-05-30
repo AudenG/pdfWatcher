@@ -1,0 +1,9 @@
+bin/
+obj/
+logs/
+*.log
+*.ocrtmp
+.claude/
+
+# Real config contains credentials — commit config.example.json instead
+config.json

@@ -96,6 +96,7 @@ Log.Information("PdfWatcher starting.");
 int emptyResponseCount = 0;
 const int CircuitBreakerLimit = 3;
 NotifyIcon? trayNotify = null;
+ToolStripMenuItem? restartItem = null;
 
 // ---- Queue and workers ----
 
@@ -236,6 +237,19 @@ var trayThread = new Thread(() =>
                 System.Diagnostics.Process.Start(
                     new System.Diagnostics.ProcessStartInfo("explorer.exe", logFolder) { UseShellExecute = true });
         });
+        restartItem = new ToolStripMenuItem("Apply Config Changes (Restart)")
+        {
+            Visible = false
+        };
+        restartItem.Click += (_, _) =>
+        {
+            Log.Information("Restarting to apply config changes.");
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true });
+            cts.Cancel();
+            Application.Exit();
+        };
+        menu.Items.Add(restartItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => { cts.Cancel(); Application.Exit(); });
 
@@ -490,12 +504,22 @@ configFileWatcher.Changed += async (_, _) =>
         }
         if (newConfig.ClientId != old.ClientId || newConfig.ClientSecret != old.ClientSecret)
             Log.Information("  Adobe credentials updated.");
-        if (newConfig.MaxConcurrentJobs != old.MaxConcurrentJobs)
-            Log.Warning("  MaxConcurrentJobs changed — restart required for this to take effect.");
-        if (!newConfig.WatchFolders.SequenceEqual(old.WatchFolders, StringComparer.OrdinalIgnoreCase))
-            Log.Warning("  WatchFolders changed — restart required for this to take effect.");
-        if (newConfig.MaxSearchDepth != old.MaxSearchDepth)
-            Log.Warning("  MaxSearchDepth changed — restart required for this to take effect.");
+        bool needsRestart =
+            newConfig.MaxConcurrentJobs != old.MaxConcurrentJobs ||
+            !newConfig.WatchFolders.SequenceEqual(old.WatchFolders, StringComparer.OrdinalIgnoreCase) ||
+            newConfig.MaxSearchDepth != old.MaxSearchDepth;
+
+        if (needsRestart)
+        {
+            Log.Warning("  One or more settings require a restart: MaxConcurrentJobs, WatchFolders, or MaxSearchDepth changed.");
+            if (restartItem != null && !restartItem.Visible)
+            {
+                restartItem.Visible = true;
+                trayNotify?.ShowBalloonTip(8000, "PdfWatcher — Restart Required",
+                    "Config changes detected that require a restart. Right-click the tray icon to apply them.",
+                    ToolTipIcon.Warning);
+            }
+        }
     }
     catch (Exception ex)
     {

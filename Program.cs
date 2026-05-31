@@ -195,6 +195,62 @@ foreach (var folder in config.WatchFolders)
     Log.Information("Watching: {Folder}", folder);
 }
 
+// ---- Config hot-reload ----
+// Watches config.json for changes while the app is running.
+// BackupFolder and credentials apply immediately; anything that controls
+// startup structure (WatchFolders, MaxConcurrentJobs, MaxSearchDepth) requires a restart.
+
+var configFileWatcher = new FileSystemWatcher(AppContext.BaseDirectory, "config.json")
+{
+    NotifyFilter = NotifyFilters.LastWrite,
+    EnableRaisingEvents = true
+};
+
+configFileWatcher.Changed += async (_, _) =>
+{
+    await Task.Delay(500); // wait for the editor to finish writing
+    try
+    {
+        var newConfig = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(configPath));
+        if (newConfig == null) return;
+
+        var old = config;
+        config = newConfig;
+
+        Log.Information("config.json reloaded.");
+
+        if (newConfig.BackupFolder != old.BackupFolder)
+            Log.Information("  BackupFolder updated to: {Folder}", newConfig.BackupFolder);
+        if (newConfig.BackupRetentionDays != old.BackupRetentionDays)
+        {
+            Log.Information("  BackupRetentionDays updated to {Days} — running cleanup now.", newConfig.BackupRetentionDays);
+            CleanupOldBackups(newConfig);
+        }
+        if (newConfig.ClientId != old.ClientId || newConfig.ClientSecret != old.ClientSecret)
+            Log.Information("  Adobe credentials updated.");
+        bool needsRestart =
+            newConfig.MaxConcurrentJobs != old.MaxConcurrentJobs ||
+            !newConfig.WatchFolders.SequenceEqual(old.WatchFolders, StringComparer.OrdinalIgnoreCase) ||
+            newConfig.MaxSearchDepth != old.MaxSearchDepth;
+
+        if (needsRestart)
+        {
+            Log.Warning("  One or more settings require a restart: MaxConcurrentJobs, WatchFolders, or MaxSearchDepth changed.");
+            if (restartItem != null && !restartItem.Visible)
+            {
+                restartItem.Visible = true;
+                trayNotify?.ShowBalloonTip(8000, "PdfWatcher — Restart Required",
+                    "Config changes detected that require a restart. Right-click the tray icon to apply them.",
+                    ToolTipIcon.Warning);
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Log.Error("Failed to reload config.json: {Error}", ex.Message);
+    }
+};
+
 Log.Information("PdfWatcher running. Look for the tray icon to exit.");
 
 // ---- System tray ----
@@ -470,62 +526,6 @@ string BuildBackupPath(string originalPath, string backupFolder)
     var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
     return Path.Combine(backupFolder, $"{stem}_{timestamp}.pdf");
 }
-
-// ---- Config hot-reload ----
-// Watches config.json for changes while the app is running.
-// BackupFolder and credentials apply immediately; anything that controls
-// startup structure (WatchFolders, MaxConcurrentJobs, MaxSearchDepth) requires a restart.
-
-var configFileWatcher = new FileSystemWatcher(AppContext.BaseDirectory, "config.json")
-{
-    NotifyFilter = NotifyFilters.LastWrite,
-    EnableRaisingEvents = true
-};
-
-configFileWatcher.Changed += async (_, _) =>
-{
-    await Task.Delay(500); // wait for the editor to finish writing
-    try
-    {
-        var newConfig = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(configPath));
-        if (newConfig == null) return;
-
-        var old = config;
-        config = newConfig;
-
-        Log.Information("config.json reloaded.");
-
-        if (newConfig.BackupFolder != old.BackupFolder)
-            Log.Information("  BackupFolder updated to: {Folder}", newConfig.BackupFolder);
-        if (newConfig.BackupRetentionDays != old.BackupRetentionDays)
-        {
-            Log.Information("  BackupRetentionDays updated to {Days} — running cleanup now.", newConfig.BackupRetentionDays);
-            CleanupOldBackups(newConfig);
-        }
-        if (newConfig.ClientId != old.ClientId || newConfig.ClientSecret != old.ClientSecret)
-            Log.Information("  Adobe credentials updated.");
-        bool needsRestart =
-            newConfig.MaxConcurrentJobs != old.MaxConcurrentJobs ||
-            !newConfig.WatchFolders.SequenceEqual(old.WatchFolders, StringComparer.OrdinalIgnoreCase) ||
-            newConfig.MaxSearchDepth != old.MaxSearchDepth;
-
-        if (needsRestart)
-        {
-            Log.Warning("  One or more settings require a restart: MaxConcurrentJobs, WatchFolders, or MaxSearchDepth changed.");
-            if (restartItem != null && !restartItem.Visible)
-            {
-                restartItem.Visible = true;
-                trayNotify?.ShowBalloonTip(8000, "PdfWatcher — Restart Required",
-                    "Config changes detected that require a restart. Right-click the tray icon to apply them.",
-                    ToolTipIcon.Warning);
-            }
-        }
-    }
-    catch (Exception ex)
-    {
-        Log.Error("Failed to reload config.json: {Error}", ex.Message);
-    }
-};
 
 // ---- Backup cleanup ----
 

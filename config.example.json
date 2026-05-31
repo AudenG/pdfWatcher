@@ -7,5 +7,6 @@
   ],
   "BackupFolder": "C:\\PdfWatcher\\Backups",
   "MaxConcurrentJobs": 2,
-  "MaxSearchDepth": 5
+  "MaxSearchDepth": 5,
+  "BackupRetentionDays": 30
 }

@@ -8,4 +8,5 @@ public class AppConfig
     public string BackupFolder { get; set; } = "Backups";
     public int MaxConcurrentJobs { get; set; } = 2;
     public int MaxSearchDepth { get; set; } = 5;
+    public int BackupRetentionDays { get; set; } = 30;
 }

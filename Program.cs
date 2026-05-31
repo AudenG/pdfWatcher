@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using System.Drawing;
 using System.Text.Json;
 using System.Threading.Channels;
 using System.Windows.Forms;
+using Microsoft.Win32;
 using Adobe.PDFServicesSDK;
 using Adobe.PDFServicesSDK.auth;
 using Adobe.PDFServicesSDK.io;
@@ -60,6 +60,7 @@ if (string.IsNullOrWhiteSpace(config.ClientId) || config.ClientId == "YOUR_CLIEN
 }
 
 Directory.CreateDirectory(config.BackupFolder);
+CleanupOldBackups(config);
 
 // ---- Startup validations ----
 
@@ -208,7 +209,27 @@ var trayThread = new Thread(() =>
 
         var logFolder = Path.Combine(AppContext.BaseDirectory, "logs");
 
+        var startupItem = new ToolStripMenuItem("Start with Windows")
+        {
+            Checked = IsStartupEnabled(),
+            CheckOnClick = true
+        };
+        startupItem.Click += (_, _) =>
+        {
+            SetStartup(startupItem.Checked);
+            Log.Information("Start with Windows {State}.", startupItem.Checked ? "enabled" : "disabled");
+        };
+
         var menu = new ContextMenuStrip();
+        menu.Items.Add(startupItem);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Re-scan Folders", null, (_, _) =>
+        {
+            Log.Information("Manual re-scan triggered from tray.");
+            foreach (var folder in config.WatchFolders.Where(Directory.Exists))
+                ScanExisting(folder, config.MaxSearchDepth, channel.Writer);
+        });
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Open Log Folder", null, (_, _) =>
         {
             if (Directory.Exists(logFolder))
@@ -269,6 +290,7 @@ async Task ProcessFileAsync(string path, AppConfig cfg)
     var originalSize = new FileInfo(path).Length;
     var backupPath = BuildBackupPath(path, cfg.BackupFolder);
     File.Copy(path, backupPath);
+    File.SetLastWriteTime(backupPath, DateTime.Now); // stamp with copy time so retention cleanup works correctly
     Log.Information("  Backed up -> {Backup}", backupPath);
 
     var tempPath = path + ".ocrtmp";
@@ -433,4 +455,93 @@ string BuildBackupPath(string originalPath, string backupFolder)
     var stem = Path.GetFileNameWithoutExtension(originalPath);
     var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
     return Path.Combine(backupFolder, $"{stem}_{timestamp}.pdf");
+}
+
+// ---- Config hot-reload ----
+// Watches config.json for changes while the app is running.
+// BackupFolder and credentials apply immediately; anything that controls
+// startup structure (WatchFolders, MaxConcurrentJobs, MaxSearchDepth) requires a restart.
+
+var configFileWatcher = new FileSystemWatcher(AppContext.BaseDirectory, "config.json")
+{
+    NotifyFilter = NotifyFilters.LastWrite,
+    EnableRaisingEvents = true
+};
+
+configFileWatcher.Changed += async (_, _) =>
+{
+    await Task.Delay(500); // wait for the editor to finish writing
+    try
+    {
+        var newConfig = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(configPath));
+        if (newConfig == null) return;
+
+        var old = config;
+        config = newConfig;
+
+        Log.Information("config.json reloaded.");
+
+        if (newConfig.BackupFolder != old.BackupFolder)
+            Log.Information("  BackupFolder updated to: {Folder}", newConfig.BackupFolder);
+        if (newConfig.BackupRetentionDays != old.BackupRetentionDays)
+        {
+            Log.Information("  BackupRetentionDays updated to {Days} — running cleanup now.", newConfig.BackupRetentionDays);
+            CleanupOldBackups(newConfig);
+        }
+        if (newConfig.ClientId != old.ClientId || newConfig.ClientSecret != old.ClientSecret)
+            Log.Information("  Adobe credentials updated.");
+        if (newConfig.MaxConcurrentJobs != old.MaxConcurrentJobs)
+            Log.Warning("  MaxConcurrentJobs changed — restart required for this to take effect.");
+        if (!newConfig.WatchFolders.SequenceEqual(old.WatchFolders, StringComparer.OrdinalIgnoreCase))
+            Log.Warning("  WatchFolders changed — restart required for this to take effect.");
+        if (newConfig.MaxSearchDepth != old.MaxSearchDepth)
+            Log.Warning("  MaxSearchDepth changed — restart required for this to take effect.");
+    }
+    catch (Exception ex)
+    {
+        Log.Error("Failed to reload config.json: {Error}", ex.Message);
+    }
+};
+
+// ---- Backup cleanup ----
+
+void CleanupOldBackups(AppConfig cfg)
+{
+    if (cfg.BackupRetentionDays <= 0) return; // 0 = keep forever
+    if (!Directory.Exists(cfg.BackupFolder)) return;
+
+    var cutoff = DateTime.Now.AddDays(-cfg.BackupRetentionDays);
+    int deleted = 0;
+    foreach (var file in Directory.EnumerateFiles(cfg.BackupFolder, "*.pdf"))
+    {
+        try
+        {
+            if (File.GetLastWriteTime(file) < cutoff)
+            {
+                File.Delete(file);
+                deleted++;
+            }
+        }
+        catch (Exception ex) { Log.Warning("Could not delete old backup {File}: {Error}", Path.GetFileName(file), ex.Message); }
+    }
+    if (deleted > 0)
+        Log.Information("Deleted {Count} backup(s) older than {Days} days.", deleted, cfg.BackupRetentionDays);
+}
+
+// ---- Startup registry helpers ----
+
+bool IsStartupEnabled()
+{
+    using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run");
+    return key?.GetValue("PdfWatcher") != null;
+}
+
+void SetStartup(bool enable)
+{
+    using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", writable: true);
+    if (key == null) return;
+    if (enable)
+        key.SetValue("PdfWatcher", $"\"{Environment.ProcessPath}\"");
+    else
+        key.DeleteValue("PdfWatcher", throwOnMissingValue: false);
 }

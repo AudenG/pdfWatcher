@@ -1,0 +1,132 @@
+<UserControl x:Class="PdfWatcher.Gui.Views.LogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:pw="clr-namespace:PdfWatcher"
+             Background="{StaticResource WindowBg}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0"
+                Background="{StaticResource PanelBg}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="0,0,0,1"
+                Padding="16,10">
+            <Grid>
+                <StackPanel Orientation="Horizontal">
+                    <ToggleButton Content="INF" IsChecked="{Binding ShowInf}" Style="{StaticResource FilterChip}"/>
+                    <ToggleButton Content="WRN" IsChecked="{Binding ShowWrn}" Style="{StaticResource FilterChip}"/>
+                    <ToggleButton Content="ERR" IsChecked="{Binding ShowErr}" Style="{StaticResource FilterChip}"/>
+                    <ToggleButton Content="FTL" IsChecked="{Binding ShowFtl}" Style="{StaticResource FilterChip}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Open Log Folder"
+                            Style="{StaticResource GhostButton}"
+                            Command="{Binding OpenLogFolderCommand}"
+                            Margin="0,0,8,0"/>
+                    <Button Content="Clear"
+                            Style="{StaticResource GhostButton}"
+                            Command="{Binding ClearCommand}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Log list -->
+        <ScrollViewer Grid.Row="1"
+                      x:Name="LogScroller"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      ScrollChanged="LogScroller_ScrollChanged">
+            <ItemsControl x:Name="LogItems"
+                          ItemsSource="{Binding Filter}"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type pw:LogEntry}">
+                        <Border Padding="16,4"
+                                BorderBrush="{StaticResource Border}"
+                                BorderThickness="0,0,0,1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140"/>
+                                    <ColumnDefinition Width="34"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Timestamp -->
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Timestamp, StringFormat=yyyy-MM-dd HH:mm:ss}"
+                                           Foreground="{StaticResource TextMuted}"
+                                           FontSize="11"
+                                           FontFamily="Consolas"
+                                           VerticalAlignment="Center"/>
+
+                                <!-- Level badge -->
+                                <Border Grid.Column="1" CornerRadius="2" Padding="3,1" Margin="0,0,8,0">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{StaticResource CardBg}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Level}" Value="WRN">
+                                                    <Setter Property="Background" Value="#3A2800"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Level}" Value="ERR">
+                                                    <Setter Property="Background" Value="#3A0000"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Level}" Value="FTL">
+                                                    <Setter Property="Background" Value="#5A0000"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding Level}"
+                                               FontSize="10"
+                                               FontFamily="Consolas"
+                                               FontWeight="SemiBold"
+                                               HorizontalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource TextSecond}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Level}" Value="WRN">
+                                                        <Setter Property="Foreground" Value="{StaticResource Warning}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Level}" Value="ERR">
+                                                        <Setter Property="Foreground" Value="{StaticResource Error}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Level}" Value="FTL">
+                                                        <Setter Property="Foreground" Value="{StaticResource Error}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Border>
+
+                                <!-- Message -->
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding Message}"
+                                           FontFamily="Consolas"
+                                           FontSize="12"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"
+                                           ToolTip="{Binding Message}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+    </Grid>
+</UserControl>

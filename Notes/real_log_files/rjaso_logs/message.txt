@@ -1,0 +1,35 @@
+[2026-06-05 07:52:20 WRN] File not accessible after retries, skipping: policy-1-HNY-TX-01-01560915-01-8gu23CYM.pdf
+[2026-06-05 12:54:33 WRN] File not accessible after retries, skipping: 2025 RJG BG Income Tax Bill.pdf
+[2026-06-05 12:54:34 WRN] Skipping 2025 RJG BG Income Tax Bill.pdf — could not read it to check for text (Could not find the version header comment at the start of the document.). If it is password-protected or corrupt it cannot be OCR'd.
+[2026-06-05 20:53:09 WRN] File not accessible after retries, skipping: Auden Griffin Employee Packet.pdf
+[2026-06-05 20:53:10 INF] Processing: C:\Users\rjaso\OneDrive - Griffin Law Firm, PLLC\OneDesktop\Auden Griffin Employee Packet.pdf
+[2026-06-05 20:53:10 INF]   Backed up -> C:\PdfWatcher\Backups\Auden Griffin Employee Packet_20260605_205310_090.pdf
+[2026-06-05 20:53:31 INF]   Done: Auden Griffin Employee Packet.pdf
+[2026-06-05 20:59:06 INF] Manual re-scan triggered from tray.
+[2026-06-05 20:59:06 INF] Processing: C:\Users\rjaso\OneDrive - Griffin Law Firm, PLLC\OneDownloads\2023 FINANCIALS.pdf
+[2026-06-05 20:59:06 INF]   Backed up -> C:\PdfWatcher\Backups\2023 FINANCIALS_20260605_205906_665.pdf
+[2026-06-05 20:59:13 INF]   Done: 2023 FINANCIALS.pdf
+[2026-06-05 20:59:25 INF] Processing: C:\Users\rjaso\OneDrive - Griffin Law Firm, PLLC\OneDocuments\MBA School\Courses\Production Operations Management SCM 6301\SCM Articles\The Lean Service Machine.pdf
+[2026-06-05 20:59:25 INF]   Backed up -> C:\PdfWatcher\Backups\The Lean Service Machine_20260605_205925_469.pdf
+[2026-06-05 20:59:33 WRN] OCR attempt 1/3 failed for The Lean Service Machine.pdf: An Internal Server Error has occurred.; requestId=571a6f0e-cb96-4d0b-bc22-310b834283f9 — retrying in 3s
+[2026-06-05 20:59:33 INF] Processing: C:\Users\rjaso\OneDrive - Griffin Law Firm, PLLC\OneDocuments\Business\Heliosphere, LLC\Archives\Heliosphere v Barbara Cambrice\MSJ Evidence\Exhibits Cover Page.pdf
+[2026-06-05 20:59:33 INF]   Backed up -> C:\PdfWatcher\Backups\Exhibits Cover Page_20260605_205933_898.pdf
+[2026-06-05 20:59:38 INF]   Done: Exhibits Cover Page.pdf
+[2026-06-05 20:59:44 WRN] OCR attempt 2/3 failed for The Lean Service Machine.pdf: An Internal Server Error has occurred.; requestId=5667d84e-17b2-42c8-af4a-5428729f2ffe — retrying in 6s
+[2026-06-05 20:59:54 INF] Processing: C:\Users\rjaso\OneDrive - Griffin Law Firm, PLLC\OneDocuments\Business\Tupoy Amerikanetz LLC\IRA Custodian Docs\Millennium\Valuations\Single_Member_Operating_Manager_Certification_Valuation form.pdf
+[2026-06-05 20:59:54 INF]   Backed up -> C:\PdfWatcher\Backups\Single_Member_Operating_Manager_Certification_Valuation form_20260605_205954_935.pdf
+[2026-06-05 20:59:57 ERR] OCR failed for The Lean Service Machine.pdf after 3 attempts
+ServiceApiException [message =An Internal Server Error has occurred.; requestId=a3e93579-bc53-4124-a8d5-06ad7a6b322a, requestId = 5d51cf65-9652-439f-848d-9cc27c26efd7, httpStatusCode = 400, errorCode = INTERNAL_SERVER_ERROR]
+[2026-06-05 21:00:03 WRN] OCR attempt 1/3 failed for Single_Member_Operating_Manager_Certification_Valuation form.pdf: An Internal Server Error has occurred.; requestId=d94aa707-3ab9-4f94-a9b3-473e34dd41db — retrying in 3s
+[2026-06-05 21:00:04 INF] Processing: C:\Users\rjaso\OneDrive - Griffin Law Firm, PLLC\OneDocuments\R\win-library\3.2\gdata\doc\gregmisc.pdf
+[2026-06-05 21:00:04 INF]   Backed up -> C:\PdfWatcher\Backups\gregmisc_20260605_210004_403.pdf
+[2026-06-05 21:00:07 WRN] OCR attempt 1/3 failed for gregmisc.pdf: The input file appears to be corrupted and cannot be processed.; requestId=23d05dfa-fee5-4114-8e90-188700fd449a — retrying in 3s
+[2026-06-05 21:00:14 WRN] OCR attempt 2/3 failed for Single_Member_Operating_Manager_Certification_Valuation form.pdf: An Internal Server Error has occurred.; requestId=969fcaed-98aa-4324-ad53-03c411050678 — retrying in 6s
+[2026-06-05 21:00:15 WRN] OCR attempt 2/3 failed for gregmisc.pdf: The input file appears to be corrupted and cannot be processed.; requestId=87ba6d01-de70-453f-ba24-512dcba72720 — retrying in 6s
+[2026-06-05 21:00:24 ERR] OCR failed for gregmisc.pdf after 3 attempts
+ServiceApiException [message =The input file appears to be corrupted and cannot be processed.; requestId=8ac99d18-b116-40c8-bd73-455b87cf382e, requestId = 4eb3ab2f-9493-4a77-88e3-686a9da308e6, httpStatusCode = 400, errorCode = CORRUPT_DOCUMENT]
+[2026-06-05 21:00:26 INF] Processing: C:\Users\rjaso\OneDrive - Griffin Law Firm, PLLC\OneDocuments\Business\Heliosphere, LLC\Archives\Heliosphere v Barbara Cambrice\MSJ Evidence\Exhibits Cover Page.pdf
+[2026-06-05 21:00:26 INF]   Backed up -> C:\PdfWatcher\Backups\Exhibits Cover Page_20260605_210026_424.pdf
+[2026-06-05 21:00:29 ERR] OCR failed for Single_Member_Operating_Manager_Certification_Valuation form.pdf after 3 attempts
+ServiceApiException [message =An Internal Server Error has occurred.; requestId=db3e0faa-fdce-4f8d-86c6-68581397aa29, requestId = 42bdbf59-2f88-44f7-8fd6-0880ca0a3457, httpStatusCode = 400, errorCode = INTERNAL_SERVER_ERROR]
+[2026-06-05 21:00:31 INF]   Done: Exhibits Cover Page.pdf

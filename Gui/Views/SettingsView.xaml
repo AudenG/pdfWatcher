@@ -1,0 +1,270 @@
+<UserControl x:Class="PdfWatcher.Gui.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource WindowBg}">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="28,24,28,24">
+
+            <!-- Header -->
+            <Grid Margin="0,0,0,20">
+                <TextBlock Text="Settings" Style="{StaticResource Heading}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock Text="Unsaved changes"
+                               Foreground="{StaticResource Warning}"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               Margin="0,0,12,0"
+                               Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVisibleConverter}}"/>
+                    <Button Content="Save"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding SaveCommand}"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Watched Folders -->
+            <TextBlock Text="WATCHED FOLDERS" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,4">
+                <StackPanel>
+                    <ListBox ItemsSource="{Binding WatchFolders}"
+                             SelectedItem="{Binding SelectedFolder}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             MinHeight="60"
+                             MaxHeight="160">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Background"  Value="Transparent"/>
+                                <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
+                                <Setter Property="FontFamily"  Value="Segoe UI"/>
+                                <Setter Property="FontSize"    Value="13"/>
+                                <Setter Property="Padding"     Value="4,3"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                                    Padding="{TemplateBinding Padding}" CornerRadius="2">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="bd" Property="Background" Value="{StaticResource Hover}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="bd" Property="Background" Value="#4A4A4A"/>
+                                                    <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                                    <Setter TargetName="bd" Property="BorderThickness" Value="3,0,0,0"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+                    <Rectangle Height="1" Fill="{StaticResource Border}" Margin="0,8"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="+ Add Folder"
+                                Style="{StaticResource GhostButton}"
+                                Command="{Binding AddFolderCommand}"
+                                Margin="0,0,8,0"/>
+                        <Button Content="Remove Selected"
+                                Style="{StaticResource GhostButton}"
+                                Command="{Binding RemoveFolderCommand}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Backup Folder -->
+            <TextBlock Text="BACKUP FOLDER" Style="{StaticResource FieldLabel}" Margin="0,16,0,8"/>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0"
+                             Text="{Binding BackupFolder, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,8,0"/>
+                    <Button Grid.Column="1"
+                            Content="Browse"
+                            Style="{StaticResource GhostButton}"
+                            Command="{Binding BrowseBackupCommand}"/>
+                </Grid>
+            </Border>
+
+            <!-- Advanced (collapsible) -->
+            <Rectangle Height="1" Fill="{StaticResource Border}" Margin="0,16,0,0"/>
+            <Expander IsExpanded="False" Margin="0,0,0,4">
+                <Expander.Template>
+                    <ControlTemplate TargetType="Expander">
+                        <StackPanel>
+                            <!-- Toggle header -->
+                            <ToggleButton IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                          HorizontalAlignment="Left" Cursor="Hand">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent" Padding="0,10">
+                                            <TextBlock x:Name="lbl"
+                                                       Text="▶ Advanced"
+                                                       FontFamily="Segoe UI"
+                                                       FontSize="13"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextSecond}"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="lbl" Property="Text" Value="▼ Advanced"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="lbl" Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <!-- Collapsible content -->
+                            <ContentPresenter x:Name="ExpandSite" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Expander.Template>
+
+                <StackPanel>
+                    <!-- Performance -->
+                    <TextBlock Text="PERFORMANCE" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="Max Concurrent Jobs"
+                                               FontFamily="Segoe UI" FontSize="10"
+                                               Foreground="{StaticResource TextSecond}"/>
+                                    <TextBlock Text=" ⓘ" FontSize="10" Cursor="Help"
+                                               Foreground="{StaticResource TextMuted}"
+                                               VerticalAlignment="Center"
+                                               ToolTipService.InitialShowDelay="200">
+                                        <TextBlock.ToolTip>
+                                            <ToolTip Background="#1A1A1A" Foreground="#F0F0F0"
+                                                     BorderBrush="#3A3A3A" BorderThickness="1"
+                                                     Padding="10,7" HasDropShadow="True">
+                                                <TextBlock TextWrapping="Wrap" MaxWidth="220"
+                                                           FontFamily="Segoe UI" FontSize="12"
+                                                           Text="How many PDFs are OCR'd at the same time. Higher values speed up large backlogs but increase CPU and memory usage. Recommended: 2."/>
+                                            </ToolTip>
+                                        </TextBlock.ToolTip>
+                                    </TextBlock>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBox Text="{Binding MaxConcurrentJobs}"
+                                             Width="48" IsReadOnly="True" TextAlignment="Center"/>
+                                    <StackPanel Margin="4,0,0,0">
+                                        <Button Content="▲" Style="{StaticResource SpinnerButton}" Command="{Binding IncJobsCommand}"/>
+                                        <Button Content="▼" Style="{StaticResource SpinnerButton}" Command="{Binding DecJobsCommand}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <TextBlock Text="(1–8)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Margin="8,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="Max Search Depth"
+                                               FontFamily="Segoe UI" FontSize="10"
+                                               Foreground="{StaticResource TextSecond}"/>
+                                    <TextBlock Text=" ⓘ" FontSize="10" Cursor="Help"
+                                               Foreground="{StaticResource TextMuted}"
+                                               VerticalAlignment="Center"
+                                               ToolTipService.InitialShowDelay="200">
+                                        <TextBlock.ToolTip>
+                                            <ToolTip Background="#1A1A1A" Foreground="#F0F0F0"
+                                                     BorderBrush="#3A3A3A" BorderThickness="1"
+                                                     Padding="10,7" HasDropShadow="True">
+                                                <TextBlock TextWrapping="Wrap" MaxWidth="220"
+                                                           FontFamily="Segoe UI" FontSize="12"
+                                                           Text="How many subfolder levels deep PdfWatcher scans inside each watched folder. Depth 1 checks only immediate children; depth 5 goes 5 levels deep."/>
+                                            </ToolTip>
+                                        </TextBlock.ToolTip>
+                                    </TextBlock>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBox Text="{Binding MaxSearchDepth}"
+                                             Width="48" IsReadOnly="True" TextAlignment="Center"/>
+                                    <StackPanel Margin="4,0,0,0">
+                                        <Button Content="▲" Style="{StaticResource SpinnerButton}" Command="{Binding IncDepthCommand}"/>
+                                        <Button Content="▼" Style="{StaticResource SpinnerButton}" Command="{Binding DecDepthCommand}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <TextBlock Text="(1–10 subfolders)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Margin="8,0,0,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="Backup Retention"
+                                               FontFamily="Segoe UI" FontSize="10"
+                                               Foreground="{StaticResource TextSecond}"/>
+                                    <TextBlock Text=" ⓘ" FontSize="10" Cursor="Help"
+                                               Foreground="{StaticResource TextMuted}"
+                                               VerticalAlignment="Center"
+                                               ToolTipService.InitialShowDelay="200">
+                                        <TextBlock.ToolTip>
+                                            <ToolTip Background="#1A1A1A" Foreground="#F0F0F0"
+                                                     BorderBrush="#3A3A3A" BorderThickness="1"
+                                                     Padding="10,7" HasDropShadow="True">
+                                                <TextBlock TextWrapping="Wrap" MaxWidth="220"
+                                                           FontFamily="Segoe UI" FontSize="12"
+                                                           Text="How many days original PDFs are kept in the backup folder before being automatically deleted. Set to 0 to keep backups indefinitely."/>
+                                            </ToolTip>
+                                        </TextBlock.ToolTip>
+                                    </TextBlock>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBox Text="{Binding BackupRetentionDays}"
+                                             Width="48" IsReadOnly="True" TextAlignment="Center"/>
+                                    <StackPanel Margin="4,0,0,0">
+                                        <Button Content="▲" Style="{StaticResource SpinnerButton}" Command="{Binding IncRetentionCommand}"/>
+                                        <Button Content="▼" Style="{StaticResource SpinnerButton}" Command="{Binding DecRetentionCommand}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <TextBlock Text="days (0 = keep forever)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Adobe Credentials -->
+                    <TextBlock Text="ADOBE PDF SERVICES CREDENTIALS" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Client ID" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding ClientId, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="0,0,0,12"/>
+                            <TextBlock Text="Client Secret" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding ClientSecret, UpdateSourceTrigger=PropertyChanged}"
+                                     FontFamily="Consolas"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Expander>
+
+            <!-- Restart notice -->
+            <Border Background="#2A2000" BorderBrush="{StaticResource Warning}" BorderThickness="1"
+                    CornerRadius="3" Padding="12,8" Margin="0,12,0,0"
+                    Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVisibleConverter}}">
+                <TextBlock Foreground="{StaticResource Warning}" FontSize="12"
+                           Text="Watch Folders, Max Concurrent Jobs, and Max Search Depth changes require a restart to take effect. Other changes apply immediately."/>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

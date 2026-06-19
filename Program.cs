@@ -1,6 +1,12 @@
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Channels;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using Adobe.PDFServicesSDK;
@@ -12,6 +18,9 @@ using Adobe.PDFServicesSDK.pdfjobs.results;
 using Serilog;
 using UglyToad.PdfPig;
 using PdfWatcher;
+
+// ---- AppState (created first so the log sink can reference it) ----
+var appState = new AppState();
 
 // ---- Logging setup ----
 
@@ -27,6 +36,7 @@ Log.Logger = new LoggerConfiguration()
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 30,
         outputTemplate: LogTemplate)
+    .WriteTo.Sink(new PdfWatcher.Gui.AppStateSink(appState))
     .CreateLogger();
 
 // ---- Config ----
@@ -62,6 +72,33 @@ if (string.IsNullOrWhiteSpace(config.ClientId) || config.ClientId == "YOUR_CLIEN
 Directory.CreateDirectory(config.BackupFolder);
 CleanupOldBackups(config);
 
+// ---- Persistent skip list ----
+// Files that return CORRUPT_DOCUMENT are added here and never retried across restarts.
+// Session-failed tracks transient failures within the current run only.
+var skipListPath = Path.Combine(AppContext.BaseDirectory, "skiplist.json");
+var permanentSkip = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+if (File.Exists(skipListPath))
+{
+    foreach (var p in JsonSerializer.Deserialize<string[]>(File.ReadAllText(skipListPath)) ?? Array.Empty<string>())
+        permanentSkip.TryAdd(p, 0);
+    if (permanentSkip.Count > 0)
+        Log.Information("Loaded {Count} permanently-skipped file(s) from skip list.", permanentSkip.Count);
+}
+var sessionFailed = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+var skipListLock = new object();
+
+void AddToPermanentSkip(string filePath)
+{
+    if (permanentSkip.TryAdd(filePath, 0))
+    {
+        Log.Warning("Added to permanent skip list — will not retry on future starts (delete skiplist.json to reset): {File}", Path.GetFileName(filePath));
+        lock (skipListLock)
+            File.WriteAllText(skipListPath, JsonSerializer.Serialize(
+                permanentSkip.Keys.OrderBy(p => p).ToArray(),
+                new JsonSerializerOptions { WriteIndented = true }));
+    }
+}
+
 // ---- Startup validations ----
 
 // Guard: backup folder must not be inside any watched folder (would cause infinite reprocessing)
@@ -94,9 +131,11 @@ Log.Information("PdfWatcher starting.");
 // Adobe returns a 0-byte file when the monthly quota is exhausted.
 // After CircuitBreakerLimit empty responses in a row, stop processing.
 int emptyResponseCount = 0;
+int activeWorkers = 0;
 const int CircuitBreakerLimit = 3;
 NotifyIcon? trayNotify = null;
 ToolStripMenuItem? restartItem = null;
+Action<AppConfig>? onConfigReloaded = null;
 
 // ---- Queue and workers ----
 
@@ -121,9 +160,16 @@ for (int i = 0; i < config.MaxConcurrentJobs; i++)
                 continue;
             }
 
+            if (permanentSkip.ContainsKey(path) || sessionFailed.ContainsKey(path))
+                continue;
+
             if (!inProgress.TryAdd(path, 0))
                 continue;
 
+            if (Interlocked.Increment(ref activeWorkers) == 1)
+                Log.Information("Status: Active.");
+
+            appState.IncrementQueue();
             try
             {
                 await ProcessFileAsync(path, config);
@@ -131,10 +177,14 @@ for (int i = 0; i < config.MaxConcurrentJobs; i++)
             catch (Exception ex)
             {
                 Log.Error(ex, "Unhandled error processing {File}", Path.GetFileName(path));
+                appState.RecordFailure(Path.GetFileName(path));
             }
             finally
             {
                 inProgress.TryRemove(path, out _);
+                appState.DecrementQueue();
+                if (Interlocked.Decrement(ref activeWorkers) == 0 && channel.Reader.Count == 0)
+                    Log.Information("Status: Waiting.");
             }
         }
     });
@@ -228,6 +278,9 @@ configFileWatcher.Changed += async (_, _) =>
         }
         if (newConfig.ClientId != old.ClientId || newConfig.ClientSecret != old.ClientSecret)
             Log.Information("  Adobe credentials updated.");
+
+        onConfigReloaded?.Invoke(newConfig);
+
         bool needsRestart =
             newConfig.MaxConcurrentJobs != old.MaxConcurrentJobs ||
             !newConfig.WatchFolders.SequenceEqual(old.WatchFolders, StringComparer.OrdinalIgnoreCase) ||
@@ -252,6 +305,8 @@ configFileWatcher.Changed += async (_, _) =>
 };
 
 Log.Information("PdfWatcher running. Look for the tray icon to exit.");
+if (Volatile.Read(ref activeWorkers) == 0)
+    Log.Information("Status: Waiting.");
 
 // ---- System tray ----
 // NotifyIcon must live on an STA thread; we share cts so Exit can cancel the main loop.
@@ -263,6 +318,29 @@ var trayThread = new Thread(() =>
     try
     {
         Application.EnableVisualStyles();
+
+        // WPF infrastructure — no separate message loop needed; WinForms' Application.Run()
+        // pumps Win32 messages for both frameworks on this STA thread.
+        var wpfApp = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+
+        // Load resources at Application level so every Window and UserControl can resolve
+        // StaticResource lookups during InitializeComponent(), before they enter the visual tree.
+        var appResources = new System.Windows.ResourceDictionary();
+        appResources.MergedDictionaries.Add(new System.Windows.ResourceDictionary
+            { Source = new Uri("pack://application:,,,/Gui/Resources/Styles.xaml") });
+        appResources["BoolToCheckConverter"]   = new PdfWatcher.Gui.BoolToCheckConverter();
+        appResources["BoolToBrushConverter"]   = new PdfWatcher.Gui.BoolToBrushConverter();
+        appResources["ZeroToVisibleConverter"] = new PdfWatcher.Gui.ZeroToVisibleConverter();
+        appResources["BoolToVisibleConverter"] = new PdfWatcher.Gui.BoolToVisibleConverter();
+        wpfApp.Resources.MergedDictionaries.Add(appResources);
+
+        var viewModel = new PdfWatcher.Gui.ViewModels.MainViewModel(
+            appState, config, configPath,
+            () => { foreach (var f in config.WatchFolders.Where(Directory.Exists)) ScanExisting(f, config.MaxSearchDepth, channel.Writer); });
+
+        var mainWindow = new PdfWatcher.Gui.MainWindow(viewModel);
+
+        onConfigReloaded = newCfg => viewModel.RefreshSettings(newCfg);
 
         var logFolder = Path.Combine(AppContext.BaseDirectory, "logs");
 
@@ -309,16 +387,29 @@ var trayThread = new Thread(() =>
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => { cts.Cancel(); Application.Exit(); });
 
+        using var iconStream = typeof(Program).Assembly.GetManifestResourceStream("PdfWatcher.icon.ico");
         trayNotify = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = iconStream != null ? new Icon(iconStream) : SystemIcons.Application,
             Text = "PdfWatcher — Running",
             ContextMenuStrip = menu,
             Visible = true
         };
 
+        trayNotify.DoubleClick += (_, _) =>
+        {
+            if (mainWindow.IsVisible) { mainWindow.Activate(); mainWindow.Focus(); }
+            else mainWindow.Show();
+        };
+
         trayReady.SetResult();
         Application.Run();
+
+        // WinForms loop exited — clean up WPF
+        if (mainWindow.IsLoaded)
+            mainWindow.Dispatcher.Invoke(() => { mainWindow.Closing -= null; mainWindow.Close(); });
+        wpfApp.Dispatcher.InvokeShutdown();
+
         trayNotify.Visible = false;
     }
     catch (Exception ex)
@@ -366,8 +457,9 @@ async Task ProcessFileAsync(string path, AppConfig cfg)
     var tempPath = path + ".ocrtmp";
     try
     {
-        bool ocrSucceeded = await RunOcrWithRetryAsync(path, tempPath, cfg);
-        if (!ocrSucceeded) return;
+        bool? ocrResult = await RunOcrWithRetryAsync(path, tempPath, cfg);
+        if (ocrResult == null) { AddToPermanentSkip(path); appState.RecordFailure(Path.GetFileName(path)); return; }
+        if (!ocrResult.Value) { sessionFailed.TryAdd(path, 0); appState.RecordFailure(Path.GetFileName(path)); return; }
 
         var resultSize = new FileInfo(tempPath).Length;
 
@@ -380,6 +472,7 @@ async Task ProcessFileAsync(string path, AppConfig cfg)
             if (count >= CircuitBreakerLimit)
             {
                 Log.Fatal("CIRCUIT OPEN: Received {Limit} empty responses in a row. Adobe monthly quota is likely exhausted. Processing is paused until the app is restarted.", CircuitBreakerLimit);
+                appState.SetQuotaExhausted();
                 trayNotify?.ShowBalloonTip(10000, "PdfWatcher — Quota Exhausted",
                     "Adobe returned empty files 3 times in a row. Monthly quota is likely exhausted. No more files will be processed until the app is restarted.",
                     ToolTipIcon.Error);
@@ -392,17 +485,21 @@ async Task ProcessFileAsync(string path, AppConfig cfg)
         {
             Log.Warning("OCR result is suspiciously small ({Result}KB vs {Original}KB original) — skipping overwrite to protect the original file.",
                 resultSize / 1024, originalSize / 1024);
+            appState.RecordFailure(Path.GetFileName(path));
             return;
         }
 
         Interlocked.Exchange(ref emptyResponseCount, 0);
-        // File.Replace is atomic on NTFS — if it fails, the original is untouched
-        File.Replace(tempPath, path, destinationBackupFileName: null);
+        // File.Replace is atomic on NTFS — if it fails, the original is untouched.
+        // Retry on IOException: OneDrive or another app may briefly hold a lock on the file.
+        await ReplaceWithRetryAsync(tempPath, path);
         Log.Information("  Done: {File}", Path.GetFileName(path));
+        appState.RecordSuccess(Path.GetFileName(path));
     }
     catch (Exception ex)
     {
         Log.Error(ex, "Failed to process {File}", Path.GetFileName(path));
+        appState.RecordFailure(Path.GetFileName(path));
     }
     finally
     {
@@ -410,7 +507,7 @@ async Task ProcessFileAsync(string path, AppConfig cfg)
     }
 }
 
-async Task<bool> RunOcrWithRetryAsync(string inputPath, string outputPath, AppConfig cfg, int maxAttempts = 3)
+async Task<bool?> RunOcrWithRetryAsync(string inputPath, string outputPath, AppConfig cfg, int maxAttempts = 3)
 {
     for (int attempt = 1; attempt <= maxAttempts; attempt++)
     {
@@ -428,6 +525,8 @@ async Task<bool> RunOcrWithRetryAsync(string inputPath, string outputPath, AppCo
         catch (Exception ex)
         {
             Log.Error(ex, "OCR failed for {File} after {Max} attempts", Path.GetFileName(inputPath), maxAttempts);
+            if (ex.ToString().Contains("CORRUPT_DOCUMENT", StringComparison.OrdinalIgnoreCase))
+                return null;
             return false;
         }
     }
@@ -518,6 +617,22 @@ async Task<bool> WaitForFileReadyAsync(string path, int maxAttempts = 6)
         }
     }
     return false;
+}
+
+async Task ReplaceWithRetryAsync(string source, string destination, int maxAttempts = 5)
+{
+    for (int i = 0; i < maxAttempts; i++)
+    {
+        try
+        {
+            File.Replace(source, destination, destinationBackupFileName: null);
+            return;
+        }
+        catch (IOException) when (i < maxAttempts - 1)
+        {
+            await Task.Delay(500 * (i + 1));
+        }
+    }
 }
 
 string BuildBackupPath(string originalPath, string backupFolder)
